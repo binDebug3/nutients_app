@@ -1,19 +1,26 @@
 from __future__ import annotations
 
 import argparse
+from logging import Logger
 from pathlib import Path
 
 import pandas as pd
 
+from logging_setup import configure_backend_logging
+
+
+log: Logger = configure_backend_logging("construct_tables")
+
 
 def parse_args() -> argparse.Namespace:
+    log.info("Parsing command-line arguments")
     script_path = Path(__file__).resolve()
     project_root = script_path.parents[2]
     default_input_dir = (
         script_path.parents[3]
         / "data"
         / "nutrients"
-        / "FoodData_Central_branded_food_csv_2025-12-18"
+        / ("FoodData_Central_branded_food_csv_2025-12-18")
     )
 
     parser = argparse.ArgumentParser(
@@ -45,6 +52,7 @@ def parse_args() -> argparse.Namespace:
 
 def read_field_descriptions(xlsx_path: Path) -> dict[str, set[str]]:
     """Parse table/field definitions from the provided workbook for schema validation."""
+    log.info("Reading field descriptions from %s", xlsx_path)
     raw = pd.read_excel(xlsx_path, sheet_name="Field Descriptions", header=None).fillna(
         ""
     )
@@ -68,6 +76,7 @@ def read_field_descriptions(xlsx_path: Path) -> dict[str, set[str]]:
 
 
 def format_serving_size(row: pd.Series) -> str:
+    log.debug("Formatting serving size for one row")
     portion_description = str(row.get("portion_description") or "").strip()
     measure_unit_name = str(row.get("measure_unit_name") or "").strip()
     modifier = str(row.get("modifier") or "").strip()
@@ -94,6 +103,7 @@ def format_serving_size(row: pd.Series) -> str:
 
 def make_unique_nutrient_column_names(nutrients: pd.DataFrame) -> pd.DataFrame:
     """Ensure one unique output column name per nutrient id."""
+    log.info("Generating unique nutrient column names")
     nutrients = nutrients.copy()
     duplicate_name_mask = nutrients["name"].duplicated(keep=False)
     nutrients["nutrient_column"] = nutrients["name"]
@@ -104,6 +114,7 @@ def make_unique_nutrient_column_names(nutrients: pd.DataFrame) -> pd.DataFrame:
 
 
 def main() -> None:
+    log.info("Starting construct_tables workflow")
     args = parse_args()
     input_dir = args.input_dir.resolve()
 
@@ -124,6 +135,7 @@ def main() -> None:
     ]
     missing_paths = [p for p in required_paths if not p.exists()]
     if missing_paths:
+        log.error("Missing required input files: %s", missing_paths)
         missing_list = "\n".join(str(p) for p in missing_paths)
         raise FileNotFoundError(f"Required input files are missing:\n{missing_list}")
 
@@ -149,9 +161,13 @@ def main() -> None:
         missing_from_definitions = fields - defined_fields
         if missing_from_definitions:
             missing_str = ", ".join(sorted(missing_from_definitions))
-            print(f"Warning: table '{table_name}' missing fields in workbook definitions: "
-                  + missing_str)
+            log.warning(
+                "Table '%s' missing fields in workbook definitions: %s",
+                table_name,
+                missing_str,
+            )
 
+    log.info("Loading source tables")
     food_df = pd.read_csv(food_path, usecols=["fdc_id", "description"])
     food_portion_df = pd.read_csv(
         food_portion_path,
@@ -223,13 +239,13 @@ def main() -> None:
     args.output_food_table.parent.mkdir(parents=True, exist_ok=True)
     args.output_unit_map.parent.mkdir(parents=True, exist_ok=True)
 
-    final_food_table.to_csv(args.output_food_table, index=False)
-    nutrient_unit_map.to_csv(args.output_unit_map, index=False)
+    final_food_table.to_csv(args.output_food_table, index=False, encoding="utf-8")
+    nutrient_unit_map.to_csv(args.output_unit_map, index=False, encoding="utf-8")
 
-    print(f"Wrote food nutrient table: {args.output_food_table}")
-    print(f"Wrote nutrient unit map: {args.output_unit_map}")
-    print(f"Food rows: {len(final_food_table):,}")
-    print(f"Nutrients mapped: {len(nutrient_unit_map):,}")
+    log.info("Wrote food nutrient table: %s", args.output_food_table)
+    log.info("Wrote nutrient unit map: %s", args.output_unit_map)
+    log.info("Food rows: %s", f"{len(final_food_table):,}")
+    log.info("Nutrients mapped: %s", f"{len(nutrient_unit_map):,}")
 
 
 if __name__ == "__main__":

@@ -7,14 +7,13 @@ prints the first 20 rows, and writes the same output to
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 
 import pandas as pd
 
+from logging_setup import configure_backend_logging
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-log = logging.getLogger(__name__)
+log = configure_backend_logging("preview_food_nutrients")
 
 SCRIPT_PATH = Path(__file__).resolve()
 DATA_DIR = SCRIPT_PATH.parents[3] / "data" / "nutrients"

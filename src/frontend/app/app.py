@@ -1,18 +1,20 @@
 import json
-import logging
+import time
 from pathlib import Path
 from typing import Dict
 
 import streamlit as st
 
+from logging_setup import configure_app_logging
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-log = logging.getLogger(__name__)
 
 APP_PATH = Path(__file__).resolve()
+REPO_ROOT = APP_PATH.parents[3]
 LOGIN_JSON_PATH = APP_PATH.parents[4] / "secrets" / "passwords" / "logins.json"
-print("start")
-print("App path:", LOGIN_JSON_PATH)
+LOGGER_MAP = configure_app_logging(REPO_ROOT)
+log = LOGGER_MAP["app"]
+auth_log = LOGGER_MAP["auth"]
+query_log = LOGGER_MAP["query"]
 
 # 1. THE LOGIN GATE
 # For a quick start, we use a simple password.
@@ -30,7 +32,10 @@ def credentials_match(username: str, password: str) -> bool:
     Returns:
         True when the username exists and the mapped password matches exactly.
     """
-    log.info("Checking credentials for username: %s", username)
+    auth_log.info(
+        "Login attempt started",
+        extra={"event": "auth.login_attempt", "username": username},
+    )
 
     if not LOGIN_JSON_PATH.exists():
         log.error("Login credentials file was not found at %s", LOGIN_JSON_PATH)
@@ -43,7 +48,20 @@ def credentials_match(username: str, password: str) -> bool:
         log.error("Login credentials file is not a JSON object")
         return False
 
-    return login_map.get(username) == password
+    is_authenticated = login_map.get(username) == password
+
+    if is_authenticated:
+        auth_log.info(
+            "Login succeeded",
+            extra={"event": "auth.login_success", "username": username},
+        )
+    else:
+        auth_log.warning(
+            "Login failed",
+            extra={"event": "auth.login_failed", "username": username},
+        )
+
+    return is_authenticated
 
 
 def check_password() -> bool:
@@ -52,7 +70,7 @@ def check_password() -> bool:
 
     Returns a boolean indicating whether the user has successfully authenticated.
     """
-    log.info("Running login gate check")
+    log.info("Running login gate check", extra={"event": "auth.gate_check"})
 
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
@@ -90,6 +108,16 @@ protein_target = st.slider("Minimum Protein (g)", 0, 50, 20)
 carb_max = st.slider("Maximum Carbs (g)", 0, 100, 10)
 
 if st.button("Find Foods"):
+    query_log.info(
+        "Food query started",
+        extra={
+            "event": "db.query_started",
+            "protein_target": protein_target,
+            "carb_max": carb_max,
+        },
+    )
+    started_at = time.perf_counter()
+
     # Note the double quotes for column names with spaces/commas
     query = f"""
         SELECT food_name, serving_size, "Protein", "Carbohydrate, by difference"
@@ -100,5 +128,24 @@ if st.button("Find Foods"):
         LIMIT 20
     """
 
-    df = conn.query(query)
+    try:
+        df = conn.query(query)
+    except Exception:
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        query_log.exception(
+            "Food query failed",
+            extra={"event": "db.query_failed", "duration_ms": duration_ms},
+        )
+        st.error("Unable to fetch foods. Please try again.")
+        st.stop()
+
+    duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+    query_log.info(
+        "Food query succeeded",
+        extra={
+            "event": "db.query_succeeded",
+            "duration_ms": duration_ms,
+            "row_count": len(df),
+        },
+    )
     st.table(df)

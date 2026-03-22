@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import argparse
-import logging
 from pathlib import Path
 
 import pandas as pd
 
+from logging_setup import configure_backend_logging
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-log = logging.getLogger(__name__)
+log = configure_backend_logging("construct_branded_tables")
 
 _SCRIPT_PATH = Path(__file__).resolve()
 _PROJECT_ROOT = _SCRIPT_PATH.parents[2]
@@ -18,13 +17,20 @@ _DEFAULT_INPUT_DIR = (
     _SCRIPT_PATH.parents[3]
     / "data"
     / "nutrients"
-    / "FoodData_Central_branded_food_csv_2025-12-18"
+    / ("FoodData_Central_branded_food_csv_2025-12-18")
 )
 _DEFAULT_FOOD_TABLE = _PROJECT_ROOT / "processed_branded_food_nutrients.csv"
 _DEFAULT_UNIT_MAP = _PROJECT_ROOT / "branded_nutrient_unit_map.csv"
 
-FIXED_COLS = ["fdc_id", "food_name", "brand_owner", "brand_name", "branded_food_category",
-              "ingredients", "serving_size"]
+FIXED_COLS = [
+    "fdc_id",
+    "food_name",
+    "brand_owner",
+    "brand_name",
+    "branded_food_category",
+    "ingredients",
+    "serving_size",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -70,7 +76,9 @@ def read_field_descriptions(xlsx_path: Path) -> dict[str, set[str]]:
         Mapping of table name to the set of field names defined for that table.
     """
     log.info("Reading field descriptions from %s", xlsx_path.name)
-    raw = pd.read_excel(xlsx_path, sheet_name="Field Descriptions", header=None).fillna("")
+    raw = pd.read_excel(xlsx_path, sheet_name="Field Descriptions", header=None).fillna(
+        ""
+    )
     definitions: dict[str, set[str]] = {}
     current_table: str | None = None
 
@@ -90,8 +98,7 @@ def read_field_descriptions(xlsx_path: Path) -> dict[str, set[str]]:
 
 
 def validate_schema(
-    definitions: dict[str, set[str]], 
-    required_fields: dict[str, set[str]]
+    definitions: dict[str, set[str]], required_fields: dict[str, set[str]]
 ) -> None:
     """Warn if any required field is absent from the workbook definitions.
 
@@ -146,9 +153,9 @@ def make_unique_nutrient_column_names(nutrients: pd.DataFrame) -> pd.DataFrame:
     nutrients = nutrients.copy()
     duplicate_mask = nutrients["name"].duplicated(keep=False)
     nutrients["nutrient_column"] = nutrients["name"]
-    nutrients.loc[duplicate_mask, "nutrient_column"] = nutrients.loc[duplicate_mask].apply(
-        lambda r: f"{r['name']} [id:{int(r['id'])}]", axis=1
-    )
+    nutrients.loc[duplicate_mask, "nutrient_column"] = nutrients.loc[
+        duplicate_mask
+    ].apply(lambda r: f"{r['name']} [id:{int(r['id'])}]", axis=1)
     log.info(
         "Resolved %d duplicate nutrient names with id suffix",
         int(duplicate_mask.sum()),
@@ -183,8 +190,16 @@ def load_serving_sizes(branded_food_path: Path) -> pd.DataFrame:
     )
     bf["serving_size"] = bf.apply(format_serving_size, axis=1)
     log.info("Loaded %d branded food records", len(bf))
-    return bf[["fdc_id", "brand_owner", "brand_name", "branded_food_category",
-               "ingredients", "serving_size"]]
+    return bf[
+        [
+            "fdc_id",
+            "brand_owner",
+            "brand_name",
+            "branded_food_category",
+            "ingredients",
+            "serving_size",
+        ]
+    ]
 
 
 def load_nutrient_lookup(nutrient_path: Path) -> pd.DataFrame:
@@ -204,7 +219,9 @@ def load_nutrient_lookup(nutrient_path: Path) -> pd.DataFrame:
     ]
 
 
-def build_nutrient_wide(food_nutrient_path: Path, nutrient_lookup: pd.DataFrame) -> pd.DataFrame:
+def build_nutrient_wide(
+    food_nutrient_path: Path, nutrient_lookup: pd.DataFrame
+) -> pd.DataFrame:
     """Pivot food_nutrient rows into a wide DataFrame with one column per nutrient.
 
     Args:
@@ -216,19 +233,27 @@ def build_nutrient_wide(food_nutrient_path: Path, nutrient_lookup: pd.DataFrame)
     """
     log.info("Reading %s", food_nutrient_path.name)
     food_nutrient_df = pd.read_csv(
-        food_nutrient_path, usecols=["fdc_id", "nutrient_id", "amount"], low_memory=False
+        food_nutrient_path,
+        usecols=["fdc_id", "nutrient_id", "amount"],
+        low_memory=False,
     )
     log.info("Loaded %d food-nutrient records", len(food_nutrient_df))
 
     merged = food_nutrient_df.merge(
-        nutrient_lookup[["nutrient_id", "nutrient_column"]], on="nutrient_id", how="inner"
+        nutrient_lookup[["nutrient_id", "nutrient_column"]],
+        on="nutrient_id",
+        how="inner",
     )
     log.info("Matched %d records after nutrient join", len(merged))
 
     # Aggregate duplicate (fdc_id, nutrient_column) pairs by mean before pivoting
-    merged = merged.groupby(["fdc_id", "nutrient_column"], as_index=False)["amount"].mean()
+    merged = merged.groupby(["fdc_id", "nutrient_column"], as_index=False)[
+        "amount"
+    ].mean()
 
-    wide = merged.pivot(index="fdc_id", columns="nutrient_column", values="amount").reset_index()
+    wide = merged.pivot(
+        index="fdc_id", columns="nutrient_column", values="amount"
+    ).reset_index()
     wide.columns.name = None
     return wide
 
@@ -244,8 +269,13 @@ def main() -> None:
     food_nutrient_path = input_dir / "food_nutrient.csv"
     nutrient_path = input_dir / "nutrient.csv"
 
-    required_paths = [workbook_path, food_path, branded_food_path, 
-                      food_nutrient_path, nutrient_path]
+    required_paths = [
+        workbook_path,
+        food_path,
+        branded_food_path,
+        food_nutrient_path,
+        nutrient_path,
+    ]
     missing = [p for p in required_paths if not p.exists()]
     if missing:
         raise FileNotFoundError(
@@ -258,8 +288,14 @@ def main() -> None:
         required_fields={
             "food": {"fdc_id", "description"},
             "branded_food": {
-                "fdc_id", "brand_owner", "brand_name", "branded_food_category",
-                "ingredients", "serving_size", "serving_size_unit", "household_serving_fulltext",
+                "fdc_id",
+                "brand_owner",
+                "brand_name",
+                "branded_food_category",
+                "ingredients",
+                "serving_size",
+                "serving_size_unit",
+                "household_serving_fulltext",
             },
             "food_nutrient": {"fdc_id", "nutrient_id", "amount"},
             "nutrient": {"id", "name", "unit_name"},
@@ -267,7 +303,9 @@ def main() -> None:
     )
 
     log.info("Reading %s", food_path.name)
-    food_df = pd.read_csv(food_path, usecols=["fdc_id", "description"], low_memory=False)
+    food_df = pd.read_csv(
+        food_path, usecols=["fdc_id", "description"], low_memory=False
+    )
     food_df = food_df.rename(columns={"description": "food_name"})
 
     branded_df = load_serving_sizes(branded_food_path)
@@ -275,19 +313,17 @@ def main() -> None:
     nutrient_wide_df = build_nutrient_wide(food_nutrient_path, nutrient_lookup)
 
     log.info("Assembling final food table")
-    final_food_table = (
-        food_df
-        .merge(branded_df, on="fdc_id", how="left")
-        .merge(nutrient_wide_df, on="fdc_id", how="left")
+    final_food_table = food_df.merge(branded_df, on="fdc_id", how="left").merge(
+        nutrient_wide_df, on="fdc_id", how="left"
     )
 
     nutrient_cols = sorted(c for c in final_food_table.columns if c not in FIXED_COLS)
     final_food_table = final_food_table[FIXED_COLS + nutrient_cols]
 
     nutrient_unit_map = (
-        nutrient_lookup
-        .rename(columns={"name": "nutrient_name"})
-        [["nutrient_id", "nutrient_name", "nutrient_column", "unit_name"]]
+        nutrient_lookup.rename(columns={"name": "nutrient_name"})[
+            ["nutrient_id", "nutrient_name", "nutrient_column", "unit_name"]
+        ]
         .sort_values("nutrient_column")
         .reset_index(drop=True)
     )

@@ -5,14 +5,15 @@ Deduplicate nutrient unit map files by the first column value.
 from __future__ import annotations
 
 import argparse
-import logging
 from pathlib import Path
 from typing import List
 
 import pandas as pd
 
+from logging_setup import configure_backend_logging
 
-LOGGER = logging.getLogger(__name__)
+
+LOGGER = configure_backend_logging("dedup_nutrs")
 TARGET_SUFFIX = "_nutrients_unit_map.csv"
 
 
@@ -53,7 +54,9 @@ def find_target_files(data_root: Path) -> List[Path]:
         List[Path]: Matching CSV file paths.
     """
     LOGGER.info("Searching for target CSV files under: %s", data_root)
-    return sorted(path for path in data_root.rglob(f"*{TARGET_SUFFIX}") if path.is_file())
+    return sorted(
+        path for path in data_root.rglob(f"*{TARGET_SUFFIX}") if path.is_file()
+    )
 
 
 def clear(file_path: Path) -> int:
@@ -87,14 +90,15 @@ def main() -> None:
     """
     Execute recursive deduplication for matching nutrient unit map CSV files.
     """
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     LOGGER.info("Starting nutrient unit map deduplication")
 
     args = parse_args()
     data_root = args.data_root.resolve()
 
     if not data_root.exists() or not data_root.is_dir():
-        raise FileNotFoundError(f"Data root does not exist or is not a directory: {data_root}")
+        raise FileNotFoundError(
+            f"Data root does not exist or is not a directory: {data_root}"
+        )
 
     target_files = find_target_files(data_root)
     total_removed = 0

@@ -9,15 +9,14 @@ single consolidated CSV file.
 from __future__ import annotations
 
 import argparse
-import logging
 from pathlib import Path
 from typing import List
 
 import pandas as pd
 
+from logging_setup import configure_backend_logging
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-log = logging.getLogger(__name__)
+log = configure_backend_logging("join")
 
 _SCRIPT_PATH = Path(__file__).resolve()
 _DEFAULT_DATA_ROOT = _SCRIPT_PATH.parents[3] / "data" / "nutrients"

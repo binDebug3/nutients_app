@@ -8,16 +8,15 @@ for each `nutrient_column`.
 from __future__ import annotations
 
 import argparse
-import logging
 from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List
 
 import pandas as pd
 
+from logging_setup import configure_backend_logging
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-log = logging.getLogger(__name__)
+log = configure_backend_logging("compare")
 
 SCRIPT_PATH = Path(__file__).resolve()
 DEFAULT_NUTRIENTS_ROOT = SCRIPT_PATH.parents[3] / "data" / "nutrients"
@@ -399,14 +398,16 @@ def main() -> None:
             nutrients_root, dataset_folders, args.map_filename, resolved_df
         )
 
-    print("=== Comparison Summary ===")
-    print(f"Nutrients root: {nutrients_root}")
-    print(f"Dataset folders compared: {len(dataset_folders)}")
-    print(f"Resolved map rows: {len(resolved_df)}")
-    print(f"Discrepancy rows: {len(discrepancy_df)}")
+    log.info("=== Comparison Summary ===")
+    log.info("Nutrients root: %s", nutrients_root)
+    log.info("Dataset folders compared: %d", len(dataset_folders))
+    log.info("Resolved map rows: %d", len(resolved_df))
+    log.info("Discrepancy rows: %d", len(discrepancy_df))
     if not discrepancy_df.empty:
-        print("\nFirst discrepancy examples:")
-        print(discrepancy_df.head(10).to_string(index=False))
+        log.info(
+            "First discrepancy examples:\n%s",
+            discrepancy_df.head(10).to_string(index=False),
+        )
 
 
 if __name__ == "__main__":
