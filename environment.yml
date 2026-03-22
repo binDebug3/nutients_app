@@ -1,0 +1,10 @@
+name: nutrient-app
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - streamlit
+  - pandas
+  - sqlalchemy
+  - psycopg2-binary
