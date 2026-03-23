@@ -15,6 +15,7 @@ from optimize import OptimizationResult, Simplex, SliderBounds
 from query_builder import FoodQueryBuilder
 from recommendation_view import RecommendationView
 from state_manager import NutrientStateManager
+from ui_theme import apply_dark_theme
 
 
 APP_PATH = Path(__file__).resolve()
@@ -250,6 +251,7 @@ def check_password() -> bool:
     if st.session_state.authenticated:
         return True
 
+    st.title("Nutrition Planner")
     st.subheader("Login or Sign Up")
     with st.form("auth_login_form", clear_on_submit=False):
         username = st.text_input("Username")
@@ -259,6 +261,42 @@ def check_password() -> bool:
             login_submitted = st.form_submit_button("Login")
         with signup_col:
             signup_submitted = st.form_submit_button("Sign Up")
+
+    # Keep login ergonomic by focusing and selecting the username on first paint.
+    try:
+        from streamlit.components.v1 import html as components_html
+
+        components_html(
+            """
+            <script>
+            const focusUsername = () => {
+                const usernameInput = window.parent.document.querySelector(
+                    'input[aria-label="Username"]'
+                );
+                if (!usernameInput) {
+                    return false;
+                }
+                usernameInput.focus();
+                usernameInput.select();
+                return true;
+            };
+
+            if (!focusUsername()) {
+                let attempts = 0;
+                const timer = setInterval(() => {
+                    attempts += 1;
+                    if (focusUsername() || attempts > 20) {
+                        clearInterval(timer);
+                    }
+                }, 100);
+            }
+            </script>
+            """,
+            height=0,
+        )
+    except Exception:
+        # Test doubles and constrained runtimes may not support component HTML.
+        pass
 
     normalized_username = AUTH_SERVICE.normalize_username(username)
 
@@ -368,10 +406,11 @@ def run_app() -> None:
     """
     Execute the Streamlit nutrient finder workflow.
     """
+    apply_dark_theme(st)
     if not check_password():
         st.stop()
     conn = st.connection("postgresql", type="sql")
-    st.title("Nutrient Goal Finder")
+    st.title("Nutrition Planner")
     dietary_preferences = _render_dietary_toggles()
 
     max_servings_per_food = st.selectbox(

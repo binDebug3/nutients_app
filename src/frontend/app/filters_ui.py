@@ -4,6 +4,7 @@ from typing import Dict, List
 
 from models import DIETARY_TOGGLE_LABELS, NutrientSpec
 from state_manager import NutrientStateManager
+from ui_theme import FILTER_HEADER_COLUMNS, FILTER_ROW_COLUMNS, safe_markdown
 
 
 class FilterPanel:
@@ -50,7 +51,8 @@ class FilterPanel:
         self._log.info(
             "Rendering dietary toggles", extra={"event": "ui.dietary.render"}
         )
-        header_columns = self._st.columns([0.5, 0.25, 0.25])
+        safe_markdown(self._st, "<div class='app-surface'>", unsafe_html=True)
+        header_columns = self._st.columns(FILTER_HEADER_COLUMNS)
         with header_columns[0]:
             self._st.subheader("Dietary Preferences")
         with header_columns[1]:
@@ -74,6 +76,7 @@ class FilterPanel:
                     value=False,
                 )
 
+        safe_markdown(self._st, "</div>", unsafe_html=True)
         return dietary_preferences
 
     def render_nutrient_filter(self, spec: NutrientSpec) -> bool:
@@ -91,7 +94,7 @@ class FilterPanel:
             extra={"event": "ui.nutrient.render", "nutrient": spec.key},
         )
         self._state_manager.initialize_nutrient_state(spec)
-        row_controls = self._st.columns([0.22, 0.1, 0.48, 0.1, 0.1])
+        row_controls = self._st.columns(FILTER_ROW_COLUMNS)
 
         with row_controls[0]:
             self._st.markdown(f"**{spec.label}**")
@@ -195,7 +198,6 @@ class FilterPanel:
                 min_value=spec.bounds[0],
                 max_value=spec.bounds[1],
                 key=self._state_manager.slider_key(spec),
-                value=spec.defaults,
                 on_change=self._state_manager.sync_inputs_from_slider,
                 args=(spec,),
                 disabled=controls_disabled,

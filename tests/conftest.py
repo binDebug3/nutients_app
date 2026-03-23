@@ -173,7 +173,7 @@ class FakeColumn:
         label: str,
         min_value: float,
         max_value: float,
-        value: tuple[float, float] | float,
+        value: tuple[float, float] | float | None = None,
         key: str | None = None,
         on_change: object | None = None,
         args: tuple[object, ...] | None = None,
@@ -186,7 +186,7 @@ class FakeColumn:
             label: Slider label.
             min_value: Minimum allowed value.
             max_value: Maximum allowed value.
-            value: Default slider value.
+            value: Optional default slider value.
             key: Session-state key.
             on_change: Optional callback.
             args: Callback arguments.
@@ -554,7 +554,7 @@ class FakeStreamlit(types.ModuleType):
         label: str,
         min_value: float,
         max_value: float,
-        value: tuple[float, float] | float,
+        value: tuple[float, float] | float | None = None,
         key: str | None = None,
         on_change: object | None = None,
         args: tuple[object, ...] | None = None,
@@ -566,7 +566,7 @@ class FakeStreamlit(types.ModuleType):
             label: Slider label.
             min_value: Minimum slider value.
             max_value: Maximum slider value.
-            value: Default slider value.
+            value: Optional default slider value.
             key: Session-state key.
             on_change: Optional callback.
             args: Optional callback arguments.
@@ -584,6 +584,8 @@ class FakeStreamlit(types.ModuleType):
             resolved_value = self.slider_values[resolved_key]
         elif resolved_key in self.session_state:
             resolved_value = self.session_state[resolved_key]
+        elif value is None:
+            resolved_value = (min_value, max_value)
         else:
             resolved_value = value
 

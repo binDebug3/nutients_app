@@ -6,6 +6,7 @@ import pandas as pd
 
 from models import DIETARY_TOGGLE_LABELS
 from optimize import OptimizationResult, SliderBounds
+from ui_theme import SUMMARY_COLUMNS, safe_markdown
 
 
 class RecommendationView:
@@ -46,12 +47,24 @@ class RecommendationView:
             "Rendering recommendation summary",
             extra={"event": "ui.recommendation.summary"},
         )
-        summary_cols = self._st.columns([1.0, 1.0, 1.2])
+        summary_cols = self._st.columns(SUMMARY_COLUMNS)
         self._render_picks(summary_cols[0], recommended_row_count)
         self._render_total_value(summary_cols[1], result.objective_value)
+        status_text = result.status or "unknown"
+        status_class = (
+            "status-ok" if status_text.lower() == "optimal" else "status-unknown"
+        )
         with summary_cols[2]:
-            self._st.markdown("### Solver Status")
-            self._st.markdown(f"## {result.status}")
+            safe_markdown(
+                self._st,
+                (
+                    "<div class='metric-card'>"
+                    "<div class='metric-label'>Solver Status</div>"
+                    f"<div class='metric-value {status_class}'>{status_text}</div>"
+                    "</div>"
+                ),
+                unsafe_html=True,
+            )
         self._render_active_preferences(dietary_preferences)
 
     def render_recommended_foods(
@@ -91,7 +104,9 @@ class RecommendationView:
             nutrient_bounds,
         )
         top_foods = ranked_df["food_name"].tolist()[:8]
+        safe_markdown(self._st, "<div class='top-picks'>", unsafe_html=True)
         self._st.write("Top picks: " + " | ".join(top_foods))
+        safe_markdown(self._st, "</div>", unsafe_html=True)
         self._render_candidate_table(recommendation_df)
 
     def _build_recommendation_df(
@@ -153,8 +168,16 @@ class RecommendationView:
             "Rendering picks summary", extra={"event": "ui.recommendation.picks"}
         )
         with column:
-            self._st.markdown("### Picks")
-            self._st.markdown(f"## {recommended_row_count}")
+            safe_markdown(
+                self._st,
+                (
+                    "<div class='metric-card'>"
+                    "<div class='metric-label'>Unique Foods</div>"
+                    f"<div class='metric-value'>{recommended_row_count}</div>"
+                    "</div>"
+                ),
+                unsafe_html=True,
+            )
 
     def _render_total_value(
         self, column: object, objective_value: Optional[float]
@@ -170,11 +193,19 @@ class RecommendationView:
             "Rendering total value summary", extra={"event": "ui.recommendation.value"}
         )
         with column:
-            self._st.markdown("### Total Value")
-            if objective_value is None:
-                self._st.markdown("## n/a")
-            else:
-                self._st.markdown(f"## {objective_value:.2f}")
+            total_value_text = (
+                "n/a" if objective_value is None else f"{objective_value:.2f}"
+            )
+            safe_markdown(
+                self._st,
+                (
+                    "<div class='metric-card'>"
+                    "<div class='metric-label'>Total Servings</div>"
+                    f"<div class='metric-value'>{total_value_text}</div>"
+                    "</div>"
+                ),
+                unsafe_html=True,
+            )
 
     def _render_active_preferences(self, dietary_preferences: Dict[str, bool]) -> None:
         """
@@ -264,22 +295,7 @@ class RecommendationView:
             )
             display_df = pd.concat([display_df, summary_rows], ignore_index=True)
 
-        try:
-            self._st.markdown(
-                """
-                <style>
-                div[data-testid=\"stDataFrame\"] div[role=\"gridcell\"] {
-                    font-size: 0.78rem;
-                }
-                div[data-testid=\"stDataFrame\"] div[role=\"columnheader\"] {
-                    font-size: 0.78rem;
-                }
-                </style>
-                """,
-                unsafe_allow_html=True,
-            )
-        except TypeError:
-            self._st.markdown("")
+        safe_markdown(self._st, "<div class='app-surface'>", unsafe_html=True)
 
         if hasattr(self._st, "dataframe"):
             self._st.dataframe(
@@ -289,6 +305,7 @@ class RecommendationView:
             )
         else:
             self._st.table(display_df)
+        safe_markdown(self._st, "</div>", unsafe_html=True)
 
     def _build_nutrient_summary_rows(
         self,
@@ -350,6 +367,7 @@ class RecommendationView:
             extra={"event": "ui.recommendation.table_candidates"},
         )
         self._st.markdown("## Candidate Foods")
+        safe_markdown(self._st, "<div class='app-surface'>", unsafe_html=True)
         self._st.table(
             recommendation_df[
                 [
@@ -361,3 +379,4 @@ class RecommendationView:
                 ]
             ]
         )
+        safe_markdown(self._st, "</div>", unsafe_html=True)
