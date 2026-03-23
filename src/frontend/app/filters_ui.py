@@ -57,7 +57,7 @@ class FilterPanel:
             if self._st.button("Remove Constraints"):
                 self._state_manager.set_all_any_toggles(nutrient_specs, False)
         with header_columns[2]:
-            if self._st.button("Apply All Nutrients"):
+            if self._st.button("Apply All Nutrients"): 
                 self._state_manager.set_all_any_toggles(nutrient_specs, True)
 
         preference_columns = self._st.columns([1.0] * len(DIETARY_TOGGLE_LABELS))
