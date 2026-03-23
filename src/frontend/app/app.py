@@ -247,8 +247,6 @@ def check_password() -> bool:
     log.info("Running login gate check", extra={"event": "auth.gate_check"})
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
-    if "login_attempting" not in st.session_state:
-        st.session_state.login_attempting = False
     if st.session_state.authenticated:
         return True
 
@@ -256,23 +254,34 @@ def check_password() -> bool:
     with st.form("auth_login_form", clear_on_submit=False):
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
-        is_loading = st.session_state.login_attempting
-        button_label = "Loading..." if is_loading else "Login"
-        login_submitted = st.form_submit_button(button_label, disabled=is_loading)
+        login_col, signup_col = st.columns([1, 1])
+        with login_col:
+            login_submitted = st.form_submit_button("Login")
+        with signup_col:
+            signup_submitted = st.form_submit_button("Sign Up")
 
     normalized_username = AUTH_SERVICE.normalize_username(username)
+    log.info(
+        "Auth form submit state",
+        extra={
+            "event": "auth.form_submit_state",
+            "username_len": len(username),
+            "password_len": len(password),
+            "login_submitted": login_submitted,
+            "signup_submitted": signup_submitted,
+        },
+    )
+
     if login_submitted:
-        st.session_state.login_attempting = True
         if credentials_match(username=username, password=password):
             st.session_state.authenticated = True
             st.session_state.current_username = normalized_username
             st.rerun()
         else:
-            st.session_state.login_attempting = False
             st.error("Invalid username or password")
         return False
 
-    if st.button("Sign Up"):
+    if signup_submitted:
         if create_account(username=username, password=password):
             st.session_state.authenticated = True
             st.session_state.current_username = normalized_username
