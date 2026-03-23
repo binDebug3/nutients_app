@@ -169,15 +169,6 @@ class AuthService:
         Returns:
             True when the account is created successfully.
         """
-        self._auth_log.info(
-            "create_account called",
-            extra={
-                "event": "auth.create_account_called",
-                "username_arg": username,
-                "username_len": len(username),
-                "password_len": len(password),
-            },
-        )
         normalized_username = self.normalize_username(username)
         self._auth_log.info(
             "Signup attempt started",
@@ -223,64 +214,17 @@ class AuthService:
             return True
 
         username, password, login_submitted, signup_submitted = self._render_auth_form()
-        self._log.info(
-            "Form rendered",
-            extra={
-                "event": "auth.form_rendered",
-                "username_from_form": username,
-                "password_from_form": "***" if password else "",
-                "login_submitted": login_submitted,
-                "signup_submitted": signup_submitted,
-            },
-        )
-        username_from_state = self._st.session_state.get(
-            "auth_username_input", ""
-        ).strip()
-        password_from_state = self._st.session_state.get("auth_password_input", "")
-        self._log.info(
-            "Session state auth inputs",
-            extra={
-                "event": "auth.session_state_read",
-                "username_from_state_len": len(username_from_state),
-                "username_from_state": username_from_state,
-                "password_from_state_len": len(password_from_state),
-                "password_from_state": "***" if password_from_state else "",
-                "session_state_keys": list(self._st.session_state.keys()),
-            },
-        )
-        normalized_username = self.normalize_username(username_from_state)
-        self._log.info(
-            "Username normalized",
-            extra={
-                "event": "auth.username_normalized_in_check",
-                "raw_username": username_from_state,
-                "normalized_username": normalized_username,
-                "normalized_len": len(normalized_username),
-            },
-        )
+        normalized_username = self.normalize_username(username)
         if login_submitted:
-            self._log.info(
-                "Login submit detected",
-                extra={"event": "auth.login_submit_detected"},
-            )
             return self._handle_login_submit(
-                username_from_state,
-                password_from_state,
+                username,
+                password,
                 normalized_username,
             )
         if signup_submitted:
-            self._log.info(
-                "Sign Up button clicked",
-                extra={
-                    "event": "auth.signup_button_clicked",
-                    "username": username_from_state,
-                    "username_len": len(username_from_state),
-                    "password_len": len(password_from_state),
-                },
-            )
             return self._handle_signup_submit(
-                username_from_state,
-                password_from_state,
+                username,
+                password,
                 normalized_username,
             )
         return False
@@ -300,39 +244,23 @@ class AuthService:
             "Validating signup input",
             extra={
                 "event": "auth.signup_validate",
-                "normalized_username": normalized_username,
-                "normalized_username_len": len(normalized_username),
-                "password_len": len(password),
-                "password_empty": not password or not password.strip(),
+                "username": normalized_username,
             },
         )
         if not normalized_username:
             self._auth_log.warning(
                 "Signup validation failed: username is empty",
-                extra={
-                    "event": "auth.signup_validate_fail_username",
-                    "username": normalized_username,
-                },
+                extra={"event": "auth.signup_validate_fail_username"},
             )
             self._show_dismissible_error("Username is required")
             return False
         if not password.strip():
             self._auth_log.warning(
                 "Signup validation failed: password is empty",
-                extra={
-                    "event": "auth.signup_validate_fail_password",
-                    "username": normalized_username,
-                },
+                extra={"event": "auth.signup_validate_fail_password"},
             )
             self._show_dismissible_error("Password is required")
             return False
-        self._auth_log.info(
-            "Signup input validation passed",
-            extra={
-                "event": "auth.signup_validate_pass",
-                "username": normalized_username,
-            },
-        )
         return True
 
     def _username_exists(self, normalized_username: str) -> bool:
@@ -427,23 +355,6 @@ class AuthService:
                 login_submitted = self._st.form_submit_button("Login")
             with signup_col:
                 signup_submitted = self._st.form_submit_button("Sign Up")
-        self._auth_log.info(
-            "Auth form rendering complete",
-            extra={
-                "event": "auth.form_render_complete",
-                "username_from_form_return": username,
-                "username_len": len(username),
-                "password_len": len(password),
-                "login_submitted": login_submitted,
-                "signup_submitted": signup_submitted,
-                "session_state_username": self._st.session_state.get(
-                    "auth_username_input", "<not set>"
-                ),
-                "session_state_password_len": len(
-                    self._st.session_state.get("auth_password_input", "")
-                ),
-            },
-        )
         return username, password, login_submitted, signup_submitted
 
     def _show_dismissible_error(self, message: str) -> None:
@@ -479,31 +390,10 @@ class AuthService:
         """
         self._auth_log.info(
             "Processing login submit",
-            extra={
-                "event": "auth.login_submit",
-                "username_arg": username,
-                "username_len": len(username),
-                "password_len": len(password),
-                "normalized_username_arg": normalized_username,
-            },
+            extra={"event": "auth.login_submit", "username": normalized_username},
         )
         is_match = self.credentials_match(username=username, password=password)
-        self._auth_log.info(
-            "Login credentials validation result",
-            extra={
-                "event": "auth.login_credentials_match",
-                "is_match": is_match,
-                "username": normalized_username,
-            },
-        )
         if is_match:
-            self._auth_log.info(
-                "Login successful, setting authenticated state",
-                extra={
-                    "event": "auth.login_success",
-                    "username": normalized_username,
-                },
-            )
             self._st.session_state.authenticated = True
             self._st.session_state.current_username = normalized_username
             self._st.rerun()
@@ -539,29 +429,11 @@ class AuthService:
             "Processing signup submit",
             extra={
                 "event": "auth.signup_submit",
-                "username_arg": username,
-                "username_len": len(username),
-                "password_len": len(password),
-                "normalized_username_arg": normalized_username,
-            },
-        )
-        account_created = self.create_account(username=username, password=password)
-        self._auth_log.info(
-            "Account creation attempt result",
-            extra={
-                "event": "auth.signup_create_account_result",
-                "account_created": account_created,
                 "username": normalized_username,
             },
         )
+        account_created = self.create_account(username=username, password=password)
         if account_created:
-            self._auth_log.info(
-                "Signup successful, setting authenticated state",
-                extra={
-                    "event": "auth.signup_success",
-                    "username": normalized_username,
-                },
-            )
             self._st.session_state.authenticated = True
             self._st.session_state.current_username = normalized_username
             self._st.rerun()

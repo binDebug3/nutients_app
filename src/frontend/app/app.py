@@ -261,16 +261,6 @@ def check_password() -> bool:
             signup_submitted = st.form_submit_button("Sign Up")
 
     normalized_username = AUTH_SERVICE.normalize_username(username)
-    log.info(
-        "Auth form submit state",
-        extra={
-            "event": "auth.form_submit_state",
-            "username_len": len(username),
-            "password_len": len(password),
-            "login_submitted": login_submitted,
-            "signup_submitted": signup_submitted,
-        },
-    )
 
     if login_submitted:
         if credentials_match(username=username, password=password):
