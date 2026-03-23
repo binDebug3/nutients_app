@@ -54,10 +54,10 @@ class FilterPanel:
         with header_columns[0]:
             self._st.subheader("Dietary Preferences")
         with header_columns[1]:
-            if self._st.button("Set All Any On"):
+            if self._st.button("Apply All Nutrients"):
                 self._state_manager.set_all_any_toggles(nutrient_specs, True)
         with header_columns[2]:
-            if self._st.button("Set All Any Off"):
+            if self._st.button("Remove Requirements"):
                 self._state_manager.set_all_any_toggles(nutrient_specs, False)
 
         preference_columns = self._st.columns([1.0] * len(DIETARY_TOGGLE_LABELS))
